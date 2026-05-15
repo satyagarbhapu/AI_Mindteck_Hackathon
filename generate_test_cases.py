@@ -1,0 +1,71 @@
+from langchain_core.messages import HumanMessage, SystemMessage
+import json
+from llm import llm
+from helper import clean_llm_output
+# -----------------------------
+# Generate Test Cases (Single Stage)
+# -----------------------------
+def generate_test_cases(
+    endpoint: str,
+    method: str,
+    function_description: str,
+    input_schema,
+    output_schema,
+    query_parameters=None,
+    more_info:str="",
+    test_scenarios=None
+):
+    if query_parameters is None:
+        query_parameters = []
+    
+    print(more_info)
+
+    system_prompt=SystemMessage( content=("""
+
+    You are a QA engineer generating pytest tests for REST APIs.
+
+    Use ONLY Test Scenarios as the source of test case generation logic.
+    However, use Input Schema, Output Schema, Method, Endpoint only as supporting information to construct and validate the test cases.
+
+    Rules:
+
+    Each test uses try/except
+    except: print(f"Error: {e}") then raise, also print one line mentioning name of testcase failed
+    success: print("Testcase passed")
+    Call API and use response.json() only after status_code check (e.g., 200)
+    Do NOT assume/fabricate endpoints, URLs, query params, or responses
+    Use ONLY given Endpoint (no modifications or additions)
+    Validate only real response data (keys/types/status/values)
+    No pytest.fail/raises
+    Name tests: test_case_1, test_case_2, ...
+    Output ONLY Python code (no markdown/text)
+
+"""))
+
+    user_prompt = HumanMessage(
+        content=f"""
+    Endpoint: {endpoint}
+    
+    Method: {method}
+
+    Input Schema:
+    {json.dumps(input_schema, indent=2)}
+
+    Output Schema:
+    {json.dumps(output_schema, indent=2)}
+
+    TEST SCENARIOS:
+    {json.dumps(test_scenarios, indent=2)}
+
+
+"""
+
+
+    )
+
+    response = llm.invoke([system_prompt, user_prompt])
+
+    cleaned = clean_llm_output(response.content)
+
+    return cleaned
+
